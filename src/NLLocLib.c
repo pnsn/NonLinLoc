@@ -3117,7 +3117,7 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
         ReadFortranInt(line, 30, 5, &itest);
         ReadFortranInt(line, 17, 1, &itest2);
         // if dummy P-phase, skip reading and try read S-phase
-        if (itest == 9999 && itest2 == 4) {
+        if ( (itest == 9999 || 0)  && itest2 == 4) {
             check_for_S_arrival = 1;
             return (OBS_FILE_SKIP_INPUT_LINE);
         } else {
