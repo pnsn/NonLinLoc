@@ -2992,7 +2992,7 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
         $   6 4.91 1.80 5.38 2.18 0.07 NSR0  -43 PHP0   38 15 525 19 483 23 258 31 168 39  80 43  66
 
          */
-
+        printf("RH DEBUG: value of check_for_S_arrival: %d\n", check_for_S_arrival);
         if (check_for_S_arrival) {
             /* check for S phase input in last input line read */
 
@@ -3113,11 +3113,13 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
         }
 
         // 2020/08/11 - JMS
-        // check for dummy P-phase (second 9999 and weight of 4)
-        ReadFortranInt(line, 30, 5, &itest);
-        ReadFortranInt(line, 17, 1, &itest2);
+        // check for dummy P-phase (weight of 4 and no "P" assigned)
+        // 2021/03/01 - BNJ 
+        //ReadFortranInt(line, 30, 5, &itest);
+        ReadFortranInt(line, 17, 1, &itest);
+        ReadFortranString(line, 15, 1, &itest2);
         // if dummy P-phase, skip reading and try read S-phase
-        if (itest == 9999 && itest2 == 4) {
+        if (itest == 4 && itest2 != 'P') {
             check_for_S_arrival = 1;
             return (OBS_FILE_SKIP_INPUT_LINE);
         } else {
@@ -14290,6 +14292,3 @@ int GenEventScatterOcttree(OcttreeParams* pParams, double oct_node_value_max, fl
 
 /** end of Octree search routines */
 /*------------------------------------------------------------/ */
-
-
-
