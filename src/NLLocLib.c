@@ -10405,19 +10405,24 @@ int GetNLLoc_PdfGrid(char* line1, int prior_type) {
             // weight is zero at coherence_min and 1.0 at coherence=1.0
             searchPdfGrid->weight[nFile]
                     = (searchPdfGrid->coherence[nFile] - searchPdfGrid->coherence_min) / (1.0 - searchPdfGrid->coherence_min);
-            // TEST 20210126 AJL - 0 -> 1 sine weighting
+            // TEST 20210126 AJL - 0 -> 1 cosine taper weighting
             if (1) {
                 // weight is zero at coherence_min and 1.0 at coherence=0.9
                 double wt_tmp = (searchPdfGrid->coherence[nFile] - searchPdfGrid->coherence_min) / (0.9 - searchPdfGrid->coherence_min);
-                if (wt_tmp > 1.0) {
+                if (wt_tmp >= 1.0) {
                     wt_tmp = 1.0;
+                } else if (wt_tmp <= 0.0) {
+                    wt_tmp = 0.0;
+                } else {
+                    //printf("DEBUG: read input oct tree file: coherence: %f  weight %f  %s", coherence[nFile], searchPdfGrid->weight[nFile], fn_pdf_grid[nFile]);
+                    // use cos instead of sin   wt_tmp = cPI * (wt_tmp - 0.5); // -PI/2 -> PI/2
+                    wt_tmp = cPI * (1.0 - wt_tmp); // PI -> 0
+                    //printf(" -> %f", wt_tmp);
+                    // use cos instead of sin   wt_tmp = 0.5 * (sin(wt_tmp) + 1.0); // 0 -> 1 sine
+                    wt_tmp = 0.5 * cos(wt_tmp) + 0.5; // 0 -> 1 cos
+                    //printf(" -> %f", wt_tmp);
+                    //printf("\n");
                 }
-                //printf("DEBUG: read input oct tree file: coherence: %f  weight %f  %s", coherence[nFile], searchPdfGrid->weight[nFile], fn_pdf_grid[nFile]);
-                wt_tmp = cPI * (wt_tmp - 0.5); // -PI/2 -> PI/2
-                //printf(" -> %f", wt_tmp);
-                wt_tmp = 0.5 * (sin(wt_tmp) + 1.0); // 0 -> 1 sine
-                //printf(" -> %f", wt_tmp);
-                //printf("\n");
                 searchPdfGrid->weight[nFile] = wt_tmp;
             }
             // END TEST
@@ -11945,6 +11950,7 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
     ArrivalDesc *parr, *psarr;
     double rms, resid, amplitude;
     double dtemp;
+    char chrtmp[MAXSTRING];
 
     char first_mot;
 
@@ -11997,8 +12003,14 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
         amp_mag_wt = (double) phypo->num_amp_mag;
     } else if (haveSumHdr) {
         // 37 3 F3.2 Amplitude magnitude.
-        sscanf(HypoInverseArchiveSumHdr + 36, "%3lf", &amp_mag);
-        amp_mag /= 100.0;
+        // JMS 20210304 - bug fix: added checks for no mag
+        strncpy(chrtmp, HypoInverseArchiveSumHdr + 36, 3);
+        chrtmp[3] = '\0';
+        if (sscanf(chrtmp, "%3lf", &amp_mag) != 0) {
+          amp_mag /= 100.0;
+        } else {
+          amp_mag = 0.0;
+        }
     } else {
         amp_mag = 0.0;
     }
@@ -12008,8 +12020,14 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
         dur_mag_wt = (double) phypo->num_dur_mag;
     } else if (haveSumHdr) {
         // 71 3 F3.2 Coda duration magnitude.
-        sscanf(HypoInverseArchiveSumHdr + 70, "%3lf", &dur_mag);
-        dur_mag /= 100.0;
+        // JMS 20210304 - bug fix: added checks for no mag
+        strncpy(chrtmp, HypoInverseArchiveSumHdr + 70, 3);
+        chrtmp[3] = '\0';
+        if (sscanf(chrtmp, "%3lf", &dur_mag) != 0) {
+          dur_mag /= 100.0;
+        } else {
+          dur_mag = 0.0;
+        }
     } else {
         dur_mag = 0.0;
     }
@@ -12058,10 +12076,16 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
             100.0 * phypo->depth);
     // 37 3 F3.2 Amplitude magnitude. *
     // AJL 20080304 - bug fix: added checks for MAGNITUDE_NULL
-    if (writeY2000)
-        fprintf(fpio, "%3.0lf", fabs(amp_mag - MAGNITUDE_NULL) > 0.01 ? 100.0 * amp_mag : 0.0);
-    else
-        fprintf(fpio, "%2.0lf", fabs(amp_mag - MAGNITUDE_NULL) > 0.01 ? 10.0 * amp_mag : 0.0);
+    // JMS 20210304 - improvement: seems unecessary now, check performed earlier at mag reading
+    // JMS 20210304 - bug fix: if no magnitude, print spaces
+    if (amp_mag == 0.0)
+        fprintf(fpio, "%s", writeY2000 ? "   " : "  " );
+    else {
+          if (writeY2000)
+              fprintf(fpio, "%3.0lf", 100.0 * amp_mag);
+          else
+              fprintf(fpio, "%2.0lf", 10.0 * amp_mag);
+        }
     // 40 3 I3 Number of P & S times with final weights greater than 0.1.
     // 43 3 I3 Maximum azimuthal gap, degrees.
     // 46 3 F3.0 Distance to nearest station (km).
@@ -12103,6 +12127,15 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
     fprintf(fpio, "000000000000000000");
 
     // 71 3 F3.2 Coda duration magnitude. *
+    // JMS 20210304 - bug fix: if no magnitude, print spaces
+    if (dur_mag == 0.0)
+        fprintf(fpio, "%s", writeY2000 ? "   " : "  " );
+    else {
+          if (writeY2000)
+              fprintf(fpio, "%3.0lf", 100.0 * dur_mag);
+          else
+              fprintf(fpio, "%2.0lf", 10.0 * dur_mag);
+        }
     // 74 3 A3 Event location remark (region), derived from location.
     // 77 4 F4.2 Size of smallest principal error (km).
     // 81 1 A1 Auxiliary remark from analyst (i.e. Q for quarry).
@@ -12111,14 +12144,12 @@ int WriteHypoInverseArchive(FILE *fpio, HypoDesc *phypo, ArrivalDesc *parrivals,
     // 86 4 F4.2 Horizontal error (km).
     // 90 4 F4.2 Vertical error (km).
     if (writeY2000) {
-        fprintf(fpio, "%3.0lf", 100.0 * dur_mag);
         // TODO this is largest princiapl error !!
         dtemp = 100.0 * phypo->ellipsoid.len3;
         fprintf(fpio, "%3.3s%4.0lf", loc_remark, dtemp < 9999.0 ? dtemp : 9999.0);
         fprintf(fpio, "%1.1s%1.1s%3.3d%4.0lf%4.0lf",
                 aux_remark, aux_remark_prog, num_S_wt, err_horiz, err_vert);
     } else {
-        fprintf(fpio, "%2.0lf", 10.0 * dur_mag);
         dtemp = 100.0 * phypo->ellipsoid.len3;
         fprintf(fpio, "%3.3s%4.0lf", loc_remark, dtemp < 9999.0 ? dtemp : 9999.0);
         fprintf(fpio, "%1.1s%1.1s%2.2d%4.0lf%4.0lf",
@@ -13109,8 +13140,7 @@ int WriteStaStatTable(int ntable, FILE *fpio,
                 res_temp = np->residual_sum / np->weight_sum;
                 res_std_temp = np->residual_square_sum / np->weight_sum - res_temp * res_temp;
                 if (np->num_residuals > 1)
-                    res_std_temp = sqrt(np->residual_square_sum / np->weight_sum
-                        - res_temp * res_temp);
+                    res_std_temp = sqrt(np->residual_square_sum / np->weight_sum - res_temp * res_temp);
                 else
                     res_std_temp = -1.0;
                 if (imode == WRITE_RESIDUALS) {
