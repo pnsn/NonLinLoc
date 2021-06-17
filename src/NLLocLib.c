@@ -3124,10 +3124,15 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
             return (OBS_FILE_SKIP_INPUT_LINE);
         } else {
             // read formatted P arrival input
-            istat = ReadFortranString(line, 1, 5, arrival->label);
-            TrimString(arrival->label);
+            // RH: changed so label is NETSTA
+            istat = ReadFortranString(line, 1, 5, chrtmp);
+            TrimString(chrtmp);
             istat = ReadFortranString(line, 6, 2, arrival->network); // network code ignored in NLL
             TrimString(arrival->network);
+            strcpy(arrival->label, arrival->network); 
+            strcat(arrival->label, chrtmp);
+            chrtmp[5] = '\0';
+            // label should be something like UWASR at this point
             istat += ReadFortranString(line, 9, 1, arrival->comp);
             TrimString(arrival->comp);
             istat += ReadFortranString(line, 10, 3, arrival->inst);
