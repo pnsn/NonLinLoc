@@ -3007,10 +3007,20 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
                     && strncmp(chrtmp + 5, "  ", 2) != 0) {
                 //printf("ACCEPT chrtmp <%s>\n", chrtmp);
                 // read S phase input in last input line read
-                istat = ReadFortranString(line, 1, 5, arrival->label);
-                TrimString(arrival->label);
+                // BNJ 7/6/2021 Adding RH change to P here for S
+                istat = ReadFortranString(line, 1, 5, chrtmp);
+                TrimString(chrtmp);
                 istat = ReadFortranString(line, 6, 2, arrival->network); // network code ignored in NLL
                 TrimString(arrival->network);
+                strcpy(arrival->label, arrival->network);
+                strcat(arrival->label, chrtmp);
+                chrtmp[5] = '\0';
+                // label should be something like UWASR at this point
+
+                //istat = ReadFortranString(line, 1, 5, arrival->label);
+                //TrimString(arrival->label);
+                //istat = ReadFortranString(line, 6, 2, arrival->network); // network code ignored in NLL
+                //TrimString(arrival->network);
                 istat += ReadFortranString(line, 9, 1, arrival->comp);
                 TrimString(arrival->comp);
                 istat += ReadFortranString(line, 10, 3, arrival->inst);
@@ -3114,7 +3124,7 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
 
         // 2020/08/11 - JMS
         // check for dummy P-phase (weight of 4 and no "P" assigned)
-        // 2021/03/01 - BNJ 
+        // 2021/03/01 - BNJ
         //ReadFortranInt(line, 30, 5, &itest);
         ReadFortranInt(line, 17, 1, &itest);
         ReadFortranString(line, 15, 1, &itest2);
@@ -3129,7 +3139,7 @@ int GetNextObs(HypoDesc* phypo, FILE* fp_obs, ArrivalDesc *arrival, char* ftype_
             TrimString(chrtmp);
             istat = ReadFortranString(line, 6, 2, arrival->network); // network code ignored in NLL
             TrimString(arrival->network);
-            strcpy(arrival->label, arrival->network); 
+            strcpy(arrival->label, arrival->network);
             strcat(arrival->label, chrtmp);
             chrtmp[5] = '\0';
             // label should be something like UWASR at this point
